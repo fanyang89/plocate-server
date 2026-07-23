@@ -26,6 +26,12 @@
 2. `$HOME/.local/share/plocate-server/files.db`
 3. `/var/lib/plocate-server/files.db`（systemd unit 落点）
 
+### 挂载点遍历
+
+每次 reindex 都以 `updatedb --config-file /dev/null` 运行，因此专用索引不会
+继承 `/etc/updatedb.conf`。`--base-path` 下所有可访问内容都会跨越 bind mount
+和其他文件系统类型被索引；这也包括全局 updatedb 配置通常会排除的 `.git` 等目录名。
+
 ## 结果限制
 
 | Flag | 环境变量 | 默认值 | 说明 |
