@@ -522,12 +522,7 @@ fn enrich_glob(pattern: &str) -> String {
 
 async fn run_updatedb(state: &AppState) -> Result<()> {
     let mut cmd = Command::new(&*state.updatedb_bin);
-    cmd.arg("-U")
-        .arg(&*state.base_path)
-        .arg("-o")
-        .arg(&*state.db_path)
-        .arg("--require-visibility")
-        .arg("no")
+    cmd.args(updatedb_args(&state.base_path, &state.db_path))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::piped());
@@ -540,6 +535,20 @@ async fn run_updatedb(state: &AppState) -> Result<()> {
         )));
     }
     Ok(())
+}
+
+/// Build a dedicated updatedb invocation that cannot inherit host-wide pruning.
+fn updatedb_args(base_path: &Path, db_path: &Path) -> Vec<OsString> {
+    vec![
+        "--config-file".into(),
+        "/dev/null".into(),
+        "-U".into(),
+        base_path.as_os_str().to_owned(),
+        "-o".into(),
+        db_path.as_os_str().to_owned(),
+        "--require-visibility".into(),
+        "no".into(),
+    ]
 }
 
 /// Spawn a command, wait for it with a timeout, and kill it if it exceeds the
@@ -722,11 +731,14 @@ pub fn proc_status() -> io::Result<(u64, u32)> {
 
 #[cfg(test)]
 mod tests {
-    use super::{BaseUrlConfig, Cache, ReindexGuard, enrich_glob, parse_base_url, parse_paths};
+    use super::{
+        BaseUrlConfig, Cache, ReindexGuard, enrich_glob, parse_base_url, parse_paths, updatedb_args,
+    };
     use nucleo_matcher::Matcher;
     use nucleo_matcher::pattern::{CaseMatching, Normalization, Pattern};
     use nucleo_matcher::{Config, Utf32Str};
     use std::cmp::Reverse;
+    use std::ffi::OsString;
     use std::path::Path;
     use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -762,6 +774,23 @@ mod tests {
         assert_eq!(enrich_glob("config json"), "config json");
         assert_eq!(enrich_glob(""), "");
         assert_eq!(enrich_glob("*"), "*");
+    }
+
+    #[test]
+    fn updatedb_args_disable_system_pruning() {
+        assert_eq!(
+            updatedb_args(Path::new("/base"), Path::new("/db/files.db")),
+            vec![
+                OsString::from("--config-file"),
+                OsString::from("/dev/null"),
+                OsString::from("-U"),
+                OsString::from("/base"),
+                OsString::from("-o"),
+                OsString::from("/db/files.db"),
+                OsString::from("--require-visibility"),
+                OsString::from("no"),
+            ]
+        );
     }
 
     /// Smoke-test the fuzzy ranking used by `search_fuzzy`: a multi-token

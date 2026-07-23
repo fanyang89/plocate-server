@@ -28,6 +28,14 @@ writable location in this chain:
 2. `$HOME/.local/share/plocate-server/files.db`
 3. `/var/lib/plocate-server/files.db` (systemd unit lands here)
 
+### Mount-point traversal
+
+Each reindex runs `updatedb --config-file /dev/null`, so the dedicated index
+does not inherit `/etc/updatedb.conf`. All accessible content below
+`--base-path` is indexed across bind mounts and other filesystem types. This
+also includes directory names such as `.git` that a host-wide updatedb
+configuration might otherwise exclude.
+
 ## Result limits
 
 | Flag | Env | Default | Notes |
