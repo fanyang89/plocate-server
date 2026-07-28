@@ -63,7 +63,10 @@ pub fn router(state: AppState) -> Router {
         .route("/api/base-path", get(health::base_path))
         .route("/api/file-server", get(health::file_server))
         .route("/api/feedback", get(health::feedback))
-        .route("/api/trending", get(trending::trending))
+        .route(
+            "/api/trending",
+            get(trending::trending).delete(trending::delete_trending),
+        )
         .merge(
             SwaggerUi::new("/swagger-ui")
                 .url(
@@ -136,6 +139,7 @@ mod tests {
             trending_bucket_secs: 3_600,
             trending_min_query_len: 2,
             trending_top_n: 20,
+            trending_blocklist_path: None,
             public_base_url: public_base_url.map(str::to_owned),
         }
     }
@@ -159,6 +163,7 @@ mod tests {
         let json: Value = serde_json::from_slice(body).unwrap();
         let version = json.get("openapi").and_then(Value::as_str).unwrap();
         assert!(version.starts_with("3."));
+        assert!(json.pointer("/paths/~1api~1trending/delete").is_some());
     }
 
     #[tokio::test]
@@ -180,5 +185,40 @@ mod tests {
         assert_eq!(status, StatusCode::OK);
         let js = String::from_utf8(body).unwrap();
         assert!(js.contains("/search/openapi.json"));
+    }
+
+    #[tokio::test]
+    async fn delete_trending_persists_and_blocks_query() {
+        let blocklist_path = std::env::temp_dir().join(format!(
+            "plocate-server-routes-blocklist-{}.json",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&blocklist_path);
+        let mut config = test_config(None);
+        config.trending_enabled = true;
+        config.trending_blocklist_path = Some(blocklist_path.clone());
+        let state = AppState::new(&config).unwrap();
+        let tracker = state.trending.clone().unwrap();
+        tracker.record("Cargo.toml");
+
+        let response = router(state)
+            .oneshot(
+                Request::builder()
+                    .method("DELETE")
+                    .uri("/api/trending?q=Cargo.toml")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::NO_CONTENT);
+        assert!(tracker.top_k(10).is_empty());
+        tracker.record("cargo.toml");
+        assert!(tracker.top_k(10).is_empty());
+        let saved: Vec<String> =
+            serde_json::from_slice(&std::fs::read(&blocklist_path).unwrap()).unwrap();
+        assert_eq!(saved, vec!["cargo.toml"]);
+        std::fs::remove_file(blocklist_path).unwrap();
     }
 }

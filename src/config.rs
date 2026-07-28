@@ -119,7 +119,8 @@ pub struct Config {
     /// Enable the trending-searches leaderboard (`/api/trending` and the
     /// "hot searches" panel in the UI). Each successful search query bumps a
     /// rolling-window counter; the top-N most frequent queries are exposed.
-    /// Pure in-memory; a restart zeroes the counts.
+    /// Counts are in-memory and reset on restart; blocked queries are persisted
+    /// separately via `--trending-blocklist-path`.
     #[arg(long, env = "PLOCATE_SERVER_TRENDING_ENABLED", default_value_t = true)]
     pub trending_enabled: bool,
 
@@ -156,6 +157,12 @@ pub struct Config {
     /// Clamped to 1..=100. Default 20.
     #[arg(long, env = "PLOCATE_SERVER_TRENDING_TOP_N", default_value_t = 20)]
     pub trending_top_n: usize,
+
+    /// JSON file containing normalized queries permanently excluded from the
+    /// trending board. Defaults to `trending-blocklist.json` next to the
+    /// plocate database.
+    #[arg(long, env = "PLOCATE_SERVER_TRENDING_BLOCKLIST_PATH")]
+    pub trending_blocklist_path: Option<PathBuf>,
 
     /// Public base URL the service is served under, when mounted behind a
     /// reverse proxy that does NOT strip the path prefix. Accepts either a
@@ -203,6 +210,13 @@ impl Config {
             base.join("plocate-server").join("files.db")
         })
     }
+
+    pub fn resolved_trending_blocklist_path(&self) -> PathBuf {
+        self.trending_blocklist_path.clone().unwrap_or_else(|| {
+            self.resolved_db_path()
+                .with_file_name("trending-blocklist.json")
+        })
+    }
 }
 
 #[cfg(test)]
@@ -232,6 +246,7 @@ mod tests {
             trending_bucket_secs: 3_600,
             trending_min_query_len: 2,
             trending_top_n: 20,
+            trending_blocklist_path: None,
             public_base_url: None,
         }
     }
@@ -252,5 +267,14 @@ mod tests {
         // prefix depends on env vars at runtime, so we only assert suffix.
         let p = cfg(None).resolved_db_path();
         assert!(p.ends_with("plocate-server/files.db"));
+    }
+
+    #[test]
+    fn blocklist_defaults_next_to_database() {
+        let config = cfg(Some(PathBuf::from("/custom/files.db")));
+        assert_eq!(
+            config.resolved_trending_blocklist_path(),
+            PathBuf::from("/custom/trending-blocklist.json")
+        );
     }
 }

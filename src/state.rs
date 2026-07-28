@@ -172,6 +172,12 @@ impl AppState {
         if let Some(parent) = db_path.parent() {
             std::fs::create_dir_all(parent)?;
         }
+        let trending_blocklist_path = cfg.resolved_trending_blocklist_path();
+        if cfg.trending_enabled
+            && let Some(parent) = trending_blocklist_path.parent()
+        {
+            std::fs::create_dir_all(parent)?;
+        }
         crate::limits::validate_skill_name(&cfg.instance_name)?;
         let parsed = parse_base_url(cfg.public_base_url.as_deref());
         Ok(Self {
@@ -204,7 +210,8 @@ impl AppState {
                     cfg.trending_bucket_secs,
                     cfg.trending_min_query_len,
                     cfg.trending_top_n,
-                ))
+                    trending_blocklist_path,
+                )?)
             } else {
                 None
             },

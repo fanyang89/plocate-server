@@ -1,10 +1,12 @@
 use axum::Json;
 use axum::extract::{Query, State};
+use axum::http::StatusCode;
 use serde::Deserialize;
 use utoipa::IntoParams;
 
 use crate::dto::{TrendingItem, TrendingResponse};
-use crate::error::Result;
+use crate::error::{AppError, Result};
+use crate::limits::validate_query;
 use crate::state::AppState;
 
 #[derive(Debug, Deserialize, IntoParams)]
@@ -43,4 +45,40 @@ pub async fn trending(
             .map(|(query, count)| TrendingItem { query, count })
             .collect(),
     }))
+}
+
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct DeleteTrendingParams {
+    /// Query to permanently exclude from the trending board.
+    pub q: String,
+}
+
+/// Permanently exclude a query from the trending board.
+#[utoipa::path(
+    delete,
+    path = "/api/trending",
+    tag = "lifecycle",
+    params(DeleteTrendingParams),
+    responses(
+        (status = 204, description = "Query blocked from trending"),
+        (status = 400, description = "Bad request", body = serde_json::Value),
+        (status = 404, description = "Trending is disabled", body = serde_json::Value),
+        (status = 500, description = "Blocklist write failed", body = serde_json::Value),
+    )
+)]
+pub async fn delete_trending(
+    State(state): State<AppState>,
+    Query(params): Query<DeleteTrendingParams>,
+) -> Result<StatusCode> {
+    validate_query(&params.q)?;
+    if params.q.trim().is_empty() {
+        return Err(AppError::BadRequest("query must not be empty".to_string()));
+    }
+    let tracker = state
+        .trending
+        .ok_or_else(|| AppError::NotFound("trending is disabled".to_string()))?;
+    tokio::task::spawn_blocking(move || tracker.block(&params.q))
+        .await
+        .map_err(|e| AppError::Internal(format!("blocklist task failed: {e}")))??;
+    Ok(StatusCode::NO_CONTENT)
 }
