@@ -184,6 +184,22 @@ export async function fetchTrending(
   return (await res.json()) as TrendingResponse
 }
 
+export async function deleteTrending(
+  query: string,
+  signal: AbortSignal,
+): Promise<void> {
+  const params = new URLSearchParams({ q: query })
+  const res = await fetch(
+    `${withPrefix("/api/trending")}?${params.toString()}`,
+    {
+      method: "DELETE",
+      signal,
+      headers: { accept: "application/json" },
+    },
+  )
+  if (!res.ok) throw new Error(`delete trending failed (${res.status})`)
+}
+
 /// Build a file-browse URL by appending a result's relative path to the
 /// file-server base. Encodes each path segment (preserves `/`) and adds a
 /// trailing slash for directories so dufs/caddy/nginx show the listing.

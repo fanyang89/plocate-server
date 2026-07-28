@@ -1,31 +1,48 @@
 import { useEffect, useRef, useState } from "react"
-import { fetchTrending, type TrendingItem } from "@/api"
+import { deleteTrending, fetchTrending, type TrendingItem } from "@/api"
 
-export type TrendingState = {
+type TrendingData = {
   items: TrendingItem[]
   loading: boolean
+  blockingQuery: string | null
+  blockError: boolean
+}
+
+export type TrendingState = TrendingData & {
+  blockQuery: (query: string) => Promise<boolean>
+  resetBlockError: () => void
 }
 
 const POLL_MS = 60_000
 
 export function useTrending(): TrendingState {
-  const [state, setState] = useState<TrendingState>({
+  const [state, setState] = useState<TrendingData>({
     items: [],
     loading: true,
+    blockingQuery: null,
+    blockError: false,
   })
-  const abortRef = useRef<AbortController | null>(null)
+  const fetchAbortRef = useRef<AbortController | null>(null)
+  const blockAbortRef = useRef<AbortController | null>(null)
+  const hiddenQueriesRef = useRef(new Set<string>())
 
   useEffect(() => {
     let cancelled = false
 
     const tick = async () => {
       const ctrl = new AbortController()
-      abortRef.current?.abort()
-      abortRef.current = ctrl
+      fetchAbortRef.current?.abort()
+      fetchAbortRef.current = ctrl
       try {
         const data = await fetchTrending(ctrl.signal)
         if (!cancelled) {
-          setState({ items: data.items, loading: false })
+          setState((current) => ({
+            ...current,
+            items: data.items.filter(
+              (item) => !hiddenQueriesRef.current.has(item.query),
+            ),
+            loading: false,
+          }))
         }
       } catch (e) {
         if ((e as Error).name === "AbortError") return
@@ -39,9 +56,46 @@ export function useTrending(): TrendingState {
     return () => {
       cancelled = true
       clearInterval(id)
-      abortRef.current?.abort()
+      fetchAbortRef.current?.abort()
+      blockAbortRef.current?.abort()
     }
   }, [])
 
-  return state
+  const blockQuery = async (query: string) => {
+    fetchAbortRef.current?.abort()
+    const ctrl = new AbortController()
+    blockAbortRef.current?.abort()
+    blockAbortRef.current = ctrl
+    setState((current) => ({
+      ...current,
+      blockingQuery: query,
+      blockError: false,
+    }))
+    try {
+      await deleteTrending(query, ctrl.signal)
+      hiddenQueriesRef.current.add(query)
+      setState((current) => ({
+        ...current,
+        items: current.items.filter((item) => item.query !== query),
+        blockingQuery: null,
+      }))
+      return true
+    } catch (e) {
+      if ((e as Error).name === "AbortError") return false
+      setState((current) => ({
+        ...current,
+        blockingQuery: null,
+        blockError: true,
+      }))
+      return false
+    } finally {
+      if (blockAbortRef.current === ctrl) blockAbortRef.current = null
+    }
+  }
+
+  const resetBlockError = () => {
+    setState((current) => ({ ...current, blockError: false }))
+  }
+
+  return { ...state, blockQuery, resetBlockError }
 }
