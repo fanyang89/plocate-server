@@ -220,7 +220,12 @@ fn normalize_query(raw: &str) -> Option<String> {
 }
 
 fn normalize_rule(raw: &str) -> Option<String> {
-    let keywords: Vec<String> = raw.split_whitespace().map(str::to_lowercase).collect();
+    let mut seen = HashSet::new();
+    let keywords: Vec<String> = raw
+        .split_whitespace()
+        .map(str::to_lowercase)
+        .filter(|keyword| seen.insert(keyword.clone()))
+        .collect();
     (!keywords.is_empty()).then(|| keywords.join(" "))
 }
 
@@ -383,7 +388,7 @@ mod tests {
     #[test]
     fn keyword_rules_use_case_insensitive_substring_and() {
         let rule = normalize_rule("  Release\u{2003}ISO release ").unwrap();
-        assert_eq!(rule, "release iso release");
+        assert_eq!(rule, "release iso");
         assert!(matches_rule("iso release x86", &rule));
         assert!(matches_rule("pre-release linux.iso", &rule));
         assert!(matches_rule("release isotope", &rule));
