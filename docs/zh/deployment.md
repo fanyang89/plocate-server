@@ -101,8 +101,8 @@ task packages      # 三者都构建
 
 ## 热门搜索屏蔽清单
 
-Web UI 的删除操作会为全局热榜永久屏蔽关键词。软件包服务将归一化后的关键词
-保存到 `/var/lib/plocate-server/trending-blocklist.json`，格式为 JSON 数组：
+Web UI 的删除操作会从全局热榜永久屏蔽同类查询。软件包服务将规范化后的关键词
+AND 规则保存到 `/var/lib/plocate-server/trending-blocklist.json`，格式为 JSON 数组：
 
 ```json
 [
@@ -111,8 +111,12 @@ Web UI 的删除操作会为全局热榜永久屏蔽关键词。软件包服务�
 ]
 ```
 
+每个字符串按空白拆分。热榜查询只要以任意顺序包含全部关键词子串即为匹配，
+且不区分大小写。因此 `release iso` 会屏蔽 `iso release x86` 和
+`pre-release linux.iso`。升级后，已有字符串条目也使用相同的 AND 语义。
+
 服务只在启动时加载该文件。检查时可使用 `jq` 或其他 JSON 读取工具。要解除
-屏蔽，先停止服务，从 JSON 数组中移除对应项，再启动服务。不支持运行中直接
+规则，先停止服务，从 JSON 数组中移除对应项，再启动服务。不支持运行中直接
 编辑：同时发生的 UI 屏蔽操作可能覆盖进程外修改。
 
 ```bash

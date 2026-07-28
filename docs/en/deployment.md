@@ -104,8 +104,8 @@ this without running as root. The resulting `files.db` is owned by
 
 ## Trending query blocklist
 
-The web UI's delete action permanently blocks a query for the global trending
-leaderboard. The packaged service stores normalized queries in
+The web UI's delete action permanently blocks similar queries from the global
+trending leaderboard. The packaged service stores normalized keyword AND rules in
 `/var/lib/plocate-server/trending-blocklist.json` as a JSON array:
 
 ```json
@@ -115,8 +115,13 @@ leaderboard. The packaged service stores normalized queries in
 ]
 ```
 
+Each string is split on whitespace. A trending query matches when it contains
+every keyword as a case-insensitive substring, in any order. Thus `release iso`
+blocks `iso release x86` and `pre-release linux.iso`. Existing string entries
+use the same AND semantics after upgrading.
+
 The list is loaded at startup. To inspect it, use `jq` or another JSON reader.
-To unblock a query, stop the service, remove the entry from the JSON array, and
+To unblock a rule, stop the service, remove the entry from the JSON array, and
 start the service again. Editing while the service is running is unsupported:
 a concurrent UI block can overwrite out-of-process changes.
 

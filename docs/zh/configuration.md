@@ -66,11 +66,12 @@
 | `--trending-bucket-secs` | `PLOCATE_SERVER_TRENDING_BUCKET_SECS` | `3600` | 滑动窗口的桶大小。 |
 | `--trending-min-query-len` | `PLOCATE_SERVER_TRENDING_MIN_QUERY_LEN` | `2` | 归一化查询的最小字符数。 |
 | `--trending-top-n` | `PLOCATE_SERVER_TRENDING_TOP_N` | `20` | 默认榜单长度，限制在 1..=100。 |
-| `--trending-blocklist-path` | `PLOCATE_SERVER_TRENDING_BLOCKLIST_PATH` | 与 `files.db` 同目录 | 永久排除关键词的排序 JSON 数组。 |
+| `--trending-blocklist-path` | `PLOCATE_SERVER_TRENDING_BLOCKLIST_PATH` | 与 `files.db` 同目录 | 规范化关键词 AND 规则的排序 JSON 数组。 |
 
 软件包服务将屏蔽文件解析为
 `/var/lib/plocate-server/trending-blocklist.json`。文件损坏时服务会停止启动，
-而不是静默暴露已屏蔽的关键词。
+而不是静默暴露已屏蔽的关键词。每个字符串按空白拆分；查询包含全部关键词子串
+时即被屏蔽，匹配不区分大小写。
 
 ## UI / 实例
 

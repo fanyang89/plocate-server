@@ -70,11 +70,13 @@ because of the synchronous `stat` fan-out in `state.rs::parse_paths`.
 | `--trending-bucket-secs` | `PLOCATE_SERVER_TRENDING_BUCKET_SECS` | `3600` | Sliding-window bucket size. |
 | `--trending-min-query-len` | `PLOCATE_SERVER_TRENDING_MIN_QUERY_LEN` | `2` | Minimum normalized query length in characters. |
 | `--trending-top-n` | `PLOCATE_SERVER_TRENDING_TOP_N` | `20` | Default leaderboard size, clamped to 1..=100. |
-| `--trending-blocklist-path` | `PLOCATE_SERVER_TRENDING_BLOCKLIST_PATH` | next to `files.db` | Sorted JSON array of normalized queries permanently excluded from trending. |
+| `--trending-blocklist-path` | `PLOCATE_SERVER_TRENDING_BLOCKLIST_PATH` | next to `files.db` | Sorted JSON array of normalized keyword AND rules. |
 
 The packaged service resolves the blocklist to
 `/var/lib/plocate-server/trending-blocklist.json`. A malformed blocklist stops
-startup instead of silently exposing blocked queries.
+startup instead of silently exposing blocked queries. Each string is split on
+whitespace; a query is blocked when it contains every keyword as a
+case-insensitive substring.
 
 ## UI / instance
 

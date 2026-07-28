@@ -84,14 +84,16 @@ curl 'http://127.0.0.1:8787/api/fuzzy?q=zookeeper%20rpm%20oe1'
 by descending count. Only successful REST searches are counted; MCP searches
 never enter the leaderboard.
 
-`DELETE /api/trending?q=<query>` removes the query from every active count
-bucket and atomically adds its normalized form to the on-disk blocklist. Later
-searches still run normally but cannot make that query trend again. The call is
-idempotent and returns `204`.
+`DELETE /api/trending?q=<keywords>` splits `q` on whitespace and creates a
+case-insensitive substring AND rule. Every trending query containing all
+keywords is removed from the active count buckets and blocked from future
+counts; keyword order and extra text do not matter. For example, `release iso`
+also matches `iso release x86` and `pre-release linux.iso`, but not
+`release notes`. The call is idempotent and returns `204`.
 
 ```bash
 curl http://127.0.0.1:8787/api/trending | jq
-curl -X DELETE 'http://127.0.0.1:8787/api/trending?q=cargo.toml'
+curl -X DELETE 'http://127.0.0.1:8787/api/trending?q=release%20iso'
 ```
 
 The delete endpoint has no application-level authentication and changes the

@@ -81,13 +81,15 @@ curl 'http://127.0.0.1:8787/api/fuzzy?q=zookeeper%20rpm%20oe1'
 `GET /api/trending` 返回 `{ window_secs, items: [{ query, count }] }`，按计数
 降序排列。只有成功的 REST 搜索会被计数；MCP 搜索不会进入热榜。
 
-`DELETE /api/trending?q=<query>` 从所有当前计数桶中移除关键词，并将其归一化
-形式原子写入磁盘屏蔽清单。之后的搜索仍正常执行，但该关键词无法再次进入热榜。
+`DELETE /api/trending?q=<keywords>` 按空白拆分 `q`，生成大小写不敏感的子串
+AND 规则。包含全部关键词的热榜查询都会从当前计数桶中移除，并禁止后续计数；
+关键词顺序和额外文本不影响匹配。例如 `release iso` 也会匹配
+`iso release x86` 和 `pre-release linux.iso`，但不匹配 `release notes`。
 接口幂等，成功返回 `204`。
 
 ```bash
 curl http://127.0.0.1:8787/api/trending | jq
-curl -X DELETE 'http://127.0.0.1:8787/api/trending?q=cargo.toml'
+curl -X DELETE 'http://127.0.0.1:8787/api/trending?q=release%20iso'
 ```
 
 删除接口没有应用层鉴权，会为所有用户修改全局热榜。若不希望公开用户使用此
