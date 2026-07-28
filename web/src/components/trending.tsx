@@ -6,7 +6,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
@@ -123,9 +122,9 @@ export function Trending({ onPick }: TrendingProps) {
               {t("trending.blockFailed")}
             </p>
           )}
-          <DialogFooter>
+          <div className="flex justify-end gap-2">
             <Button
-              variant="outline"
+              variant="ghost"
               onClick={() => setCandidate(null)}
               disabled={blockingQuery !== null}
             >
@@ -143,7 +142,7 @@ export function Trending({ onPick }: TrendingProps) {
                 ? t("trending.blocking")
                 : t("trending.confirm")}
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </>
