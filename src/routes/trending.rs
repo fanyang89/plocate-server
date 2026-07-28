@@ -49,18 +49,19 @@ pub async fn trending(
 
 #[derive(Debug, Deserialize, IntoParams)]
 pub struct DeleteTrendingParams {
-    /// Query to permanently exclude from the trending board.
+    /// Whitespace-separated keywords. Queries containing every keyword are
+    /// permanently excluded from the trending board.
     pub q: String,
 }
 
-/// Permanently exclude a query from the trending board.
+/// Permanently exclude queries matching a case-insensitive keyword AND rule.
 #[utoipa::path(
     delete,
     path = "/api/trending",
     tag = "lifecycle",
     params(DeleteTrendingParams),
     responses(
-        (status = 204, description = "Query blocked from trending"),
+        (status = 204, description = "Matching queries blocked from trending"),
         (status = 400, description = "Bad request", body = serde_json::Value),
         (status = 404, description = "Trending is disabled", body = serde_json::Value),
         (status = 500, description = "Blocklist write failed", body = serde_json::Value),

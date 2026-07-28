@@ -199,13 +199,15 @@ mod tests {
         config.trending_blocklist_path = Some(blocklist_path.clone());
         let state = AppState::new(&config).unwrap();
         let tracker = state.trending.clone().unwrap();
-        tracker.record("Cargo.toml");
+        tracker.record("release linux.iso");
+        tracker.record("iso release x86");
+        tracker.record("release notes");
 
         let response = router(state)
             .oneshot(
                 Request::builder()
                     .method("DELETE")
-                    .uri("/api/trending?q=Cargo.toml")
+                    .uri("/api/trending?q=Release%20ISO")
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -213,12 +215,12 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::NO_CONTENT);
-        assert!(tracker.top_k(10).is_empty());
-        tracker.record("cargo.toml");
-        assert!(tracker.top_k(10).is_empty());
+        assert_eq!(tracker.top_k(10), vec![("release notes".to_string(), 1)]);
+        tracker.record("pre-release isotope");
+        assert_eq!(tracker.top_k(10), vec![("release notes".to_string(), 1)]);
         let saved: Vec<String> =
             serde_json::from_slice(&std::fs::read(&blocklist_path).unwrap()).unwrap();
-        assert_eq!(saved, vec!["cargo.toml"]);
+        assert_eq!(saved, vec!["release iso"]);
         std::fs::remove_file(blocklist_path).unwrap();
     }
 }

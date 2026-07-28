@@ -43,7 +43,7 @@ pub struct TrendingTracker {
 
 struct Blocklist {
     path: PathBuf,
-    queries: HashSet<String>,
+    rules: HashSet<String>,
 }
 
 impl TrendingTracker {
@@ -63,14 +63,14 @@ impl TrendingTracker {
         let window_secs = window_secs.max(1);
         let num_buckets = ((window_secs / bucket_secs).max(1)) as usize;
         let default_top_n = default_top_n.clamp(1, MAX_TOP_N);
-        let blocked_queries = load_blocklist(&blocklist_path)?;
+        let blocked_rules = load_blocklist(&blocklist_path)?;
         let me = Arc::new(Self {
             buckets: (0..num_buckets)
                 .map(|_| Mutex::new(HashMap::new()))
                 .collect(),
             blocklist: Mutex::new(Blocklist {
                 path: blocklist_path,
-                queries: blocked_queries,
+                rules: blocked_rules,
             }),
             current: AtomicUsize::new(0),
             num_buckets,
@@ -98,12 +98,12 @@ impl TrendingTracker {
 
     #[cfg(test)]
     fn for_test_with_path(min_len: usize, blocklist_path: PathBuf) -> io::Result<Arc<Self>> {
-        let blocked_queries = load_blocklist(&blocklist_path)?;
+        let blocked_rules = load_blocklist(&blocklist_path)?;
         Ok(Arc::new(Self {
             buckets: (0..3).map(|_| Mutex::new(HashMap::new())).collect(),
             blocklist: Mutex::new(Blocklist {
                 path: blocklist_path,
-                queries: blocked_queries,
+                rules: blocked_rules,
             }),
             current: AtomicUsize::new(0),
             num_buckets: 3,
@@ -152,14 +152,14 @@ impl TrendingTracker {
     /// Normalization is `trim().to_lowercase()` — collapses cosmetic
     /// whitespace/case differences without erasing meaningful path structure.
     pub fn record(&self, raw: &str) {
-        let Some(key) = normalize(raw) else {
+        let Some(key) = normalize_query(raw) else {
             return;
         };
         if key.chars().count() < self.min_len {
             return;
         }
         let blocklist = self.blocklist.lock().unwrap();
-        if blocklist.queries.contains(&key) {
+        if blocklist.rules.iter().any(|rule| matches_rule(&key, rule)) {
             return;
         }
         let idx = self.current.load(Ordering::Acquire);
@@ -167,20 +167,23 @@ impl TrendingTracker {
         *g.entry(key).or_insert(0) += 1;
     }
 
-    /// Persistently exclude a query and remove all of its current counts.
+    /// Persistently exclude queries containing every keyword in `raw`.
     pub fn block(&self, raw: &str) -> io::Result<()> {
-        let key = normalize(raw).ok_or_else(|| {
+        let rule = normalize_rule(raw).ok_or_else(|| {
             io::Error::new(io::ErrorKind::InvalidInput, "query must not be empty")
         })?;
         let mut blocklist = self.blocklist.lock().unwrap();
-        if !blocklist.queries.contains(&key) {
-            let mut next = blocklist.queries.clone();
-            next.insert(key.clone());
+        if !blocklist.rules.contains(&rule) {
+            let mut next = blocklist.rules.clone();
+            next.insert(rule.clone());
             persist_blocklist(&blocklist.path, &next)?;
-            blocklist.queries = next;
+            blocklist.rules = next;
         }
         for bucket in &self.buckets {
-            bucket.lock().unwrap().remove(&key);
+            bucket
+                .lock()
+                .unwrap()
+                .retain(|query, _| !matches_rule(query, &rule));
         }
         Ok(())
     }
@@ -211,9 +214,18 @@ impl TrendingTracker {
     }
 }
 
-fn normalize(raw: &str) -> Option<String> {
+fn normalize_query(raw: &str) -> Option<String> {
     let query = raw.trim();
     (!query.is_empty()).then(|| query.to_lowercase())
+}
+
+fn normalize_rule(raw: &str) -> Option<String> {
+    let keywords: Vec<String> = raw.split_whitespace().map(str::to_lowercase).collect();
+    (!keywords.is_empty()).then(|| keywords.join(" "))
+}
+
+fn matches_rule(query: &str, rule: &str) -> bool {
+    rule.split(' ').all(|keyword| query.contains(keyword))
 }
 
 fn load_blocklist(path: &Path) -> io::Result<HashSet<String>> {
@@ -222,20 +234,20 @@ fn load_blocklist(path: &Path) -> io::Result<HashSet<String>> {
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(HashSet::new()),
         Err(error) => return Err(error),
     };
-    let queries: Vec<String> = serde_json::from_slice(&bytes).map_err(|error| {
+    let rules: Vec<String> = serde_json::from_slice(&bytes).map_err(|error| {
         io::Error::new(
             io::ErrorKind::InvalidData,
             format!("invalid trending blocklist {}: {error}", path.display()),
         )
     })?;
-    Ok(queries
+    Ok(rules
         .into_iter()
-        .filter_map(|query| normalize(&query))
+        .filter_map(|rule| normalize_rule(&rule))
         .collect())
 }
 
-fn persist_blocklist(path: &Path, queries: &HashSet<String>) -> io::Result<()> {
-    let mut sorted: Vec<&str> = queries.iter().map(String::as_str).collect();
+fn persist_blocklist(path: &Path, rules: &HashSet<String>) -> io::Result<()> {
+    let mut sorted: Vec<&str> = rules.iter().map(String::as_str).collect();
     sorted.sort_unstable();
     let bytes = serde_json::to_vec_pretty(&sorted)
         .map_err(|error| io::Error::other(format!("serialize blocklist: {error}")))?;
@@ -348,32 +360,51 @@ mod tests {
     fn block_removes_all_counts_and_prevents_rerecording() {
         let path = blocklist_path("blocked-counts");
         let t = TrendingTracker::for_test_with_path(2, path.clone()).unwrap();
-        t.record("Cargo.toml");
+        t.record("release linux.iso");
         t.rotate();
-        t.record("cargo.toml");
+        t.record("iso release x86");
+        t.record("release notes");
 
-        t.block("  CARGO.TOML  ").unwrap();
-        assert!(t.top_k(10).is_empty());
-        t.record("cargo.toml");
-        assert!(t.top_k(10).is_empty());
+        t.block("  RELEASE\tISO  ").unwrap();
+        assert_eq!(t.top_k(10), vec![("release notes".to_string(), 1)]);
+        t.record("pre-release isotope");
+        t.record("release changelog");
+        assert_eq!(
+            t.top_k(10),
+            vec![
+                ("release changelog".to_string(), 1),
+                ("release notes".to_string(), 1)
+            ]
+        );
 
         std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn keyword_rules_use_case_insensitive_substring_and() {
+        let rule = normalize_rule("  Release\u{2003}ISO release ").unwrap();
+        assert_eq!(rule, "release iso release");
+        assert!(matches_rule("iso release x86", &rule));
+        assert!(matches_rule("pre-release linux.iso", &rule));
+        assert!(matches_rule("release isotope", &rule));
+        assert!(!matches_rule("release notes", &rule));
+        assert!(!matches_rule("linux.iso", &rule));
     }
 
     #[test]
     fn blocklist_is_sorted_and_loaded_on_restart() {
         let path = blocklist_path("persisted-blocks");
         let t = TrendingTracker::for_test_with_path(2, path.clone()).unwrap();
-        t.block("Zulu").unwrap();
+        t.block("Zulu   Build").unwrap();
         t.block(" alpha ").unwrap();
         t.block("ALPHA").unwrap();
 
         let saved: Vec<String> = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
-        assert_eq!(saved, vec!["alpha", "zulu"]);
+        assert_eq!(saved, vec!["alpha", "zulu build"]);
 
         let reloaded = TrendingTracker::for_test_with_path(2, path.clone()).unwrap();
         reloaded.record("Alpha");
-        reloaded.record("zulu");
+        reloaded.record("build-for-zulu");
         assert!(reloaded.top_k(10).is_empty());
 
         std::fs::remove_file(path).unwrap();

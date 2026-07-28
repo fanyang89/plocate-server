@@ -158,9 +158,9 @@ pub struct Config {
     #[arg(long, env = "PLOCATE_SERVER_TRENDING_TOP_N", default_value_t = 20)]
     pub trending_top_n: usize,
 
-    /// JSON file containing normalized queries permanently excluded from the
-    /// trending board. Defaults to `trending-blocklist.json` next to the
-    /// plocate database.
+    /// JSON file containing normalized keyword AND rules permanently excluded
+    /// from the trending board. Defaults to `trending-blocklist.json` next to
+    /// the plocate database.
     #[arg(long, env = "PLOCATE_SERVER_TRENDING_BLOCKLIST_PATH")]
     pub trending_blocklist_path: Option<PathBuf>,
 
