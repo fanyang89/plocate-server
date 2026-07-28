@@ -99,6 +99,33 @@ task packages      # 三者都构建
 完成遍历。生成的 `files.db` 归 `plocate-server` 所有，因此 `plocate` 子
 进程可直接读回。
 
+## 热门搜索屏蔽清单
+
+Web UI 的删除操作会为全局热榜永久屏蔽关键词。软件包服务将归一化后的关键词
+保存到 `/var/lib/plocate-server/trending-blocklist.json`，格式为 JSON 数组：
+
+```json
+[
+  "cargo.toml",
+  "release iso"
+]
+```
+
+服务只在启动时加载该文件。检查时可使用 `jq` 或其他 JSON 读取工具。要解除
+屏蔽，先停止服务，从 JSON 数组中移除对应项，再启动服务。不支持运行中直接
+编辑：同时发生的 UI 屏蔽操作可能覆盖进程外修改。
+
+```bash
+sudo systemctl stop plocate-server
+sudo jq . /var/lib/plocate-server/trending-blocklist.json
+# 编辑 JSON 数组，然后：
+sudo systemctl start plocate-server
+```
+
+搜索计数保存在内存中，重启后清零；屏蔽清单会保留。`DELETE /api/trending`
+没有应用层鉴权，任何能访问它的用户都能为全局热榜屏蔽关键词。
+不符合部署预期时，应在反向代理层增加访问控制。
+
 ## 挂载到路径前缀
 
 默认挂载在 `/`。要挂到子路径下（如

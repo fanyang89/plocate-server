@@ -5,7 +5,8 @@ plocate-server 还通过 Streamable HTTP 在 `POST /mcp` 上说
 直接搜索索引树。源码：`src/mcp.rs`。
 
 `/mcp` 是 **无状态** 的 —— 每个 JSON-RPC 请求自包含，无需会话握手。它与
-REST API 共享同一套引擎、并发上限、超时和输入限制。
+REST API 共享同一套引擎、并发上限、超时和输入限制。MCP 搜索不会计入热门
+搜索榜。
 
 ## 工具
 

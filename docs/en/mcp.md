@@ -7,7 +7,8 @@ HTTP at `POST /mcp`, so AI agents can search the indexed tree directly. Source:
 
 `/mcp` is **stateless** — each JSON-RPC request is self-contained, no session
 handshake required. It shares the same engine, concurrency cap, timeouts, and
-input limits as the REST API.
+input limits as the REST API. MCP searches are not counted by the trending
+leaderboard.
 
 ## Tools
 

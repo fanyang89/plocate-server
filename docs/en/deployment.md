@@ -102,6 +102,36 @@ grants `CAP_DAC_READ_SEARCH` so the unprivileged `plocate-server` user can do
 this without running as root. The resulting `files.db` is owned by
 `plocate-server`, so the `plocate` child can read it back directly.
 
+## Trending query blocklist
+
+The web UI's delete action permanently blocks a query for the global trending
+leaderboard. The packaged service stores normalized queries in
+`/var/lib/plocate-server/trending-blocklist.json` as a JSON array:
+
+```json
+[
+  "cargo.toml",
+  "release iso"
+]
+```
+
+The list is loaded at startup. To inspect it, use `jq` or another JSON reader.
+To unblock a query, stop the service, remove the entry from the JSON array, and
+start the service again. Editing while the service is running is unsupported:
+a concurrent UI block can overwrite out-of-process changes.
+
+```bash
+sudo systemctl stop plocate-server
+sudo jq . /var/lib/plocate-server/trending-blocklist.json
+# Edit the JSON array, then:
+sudo systemctl start plocate-server
+```
+
+Search counts remain in memory and reset on restart. The blocklist persists.
+`DELETE /api/trending` has no application-level authentication, so every user
+who can reach it can globally block a query. Apply reverse
+proxy access controls if that is not intended for a deployment.
+
 ## Mount under a path prefix
 
 By default the server mounts at `/`. To serve it under a sub-path (e.g.

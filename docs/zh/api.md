@@ -14,6 +14,8 @@
 | GET | `/api/base-path` | lifecycle | 当前索引的根目录 |
 | GET | `/api/file-server` | lifecycle | 外部文件服务基址（如已配置） |
 | GET | `/api/feedback` | lifecycle | 联系邮箱（如已配置） |
+| GET | `/api/trending` | lifecycle | 滚动窗口内的 REST 搜索热榜 |
+| DELETE | `/api/trending` | lifecycle | 从热榜永久屏蔽关键词 |
 
 另有自动生成的接口：
 
@@ -73,6 +75,24 @@ fzf 风格的模糊相关度排序。适合子串搜索返回空的多关键词�
 ```bash
 curl 'http://127.0.0.1:8787/api/fuzzy?q=zookeeper%20rpm%20oe1'
 ```
+
+## `/api/trending`
+
+`GET /api/trending` 返回 `{ window_secs, items: [{ query, count }] }`，按计数
+降序排列。只有成功的 REST 搜索会被计数；MCP 搜索不会进入热榜。
+
+`DELETE /api/trending?q=<query>` 从所有当前计数桶中移除关键词，并将其归一化
+形式原子写入磁盘屏蔽清单。之后的搜索仍正常执行，但该关键词无法再次进入热榜。
+接口幂等，成功返回 `204`。
+
+```bash
+curl http://127.0.0.1:8787/api/trending | jq
+curl -X DELETE 'http://127.0.0.1:8787/api/trending?q=cargo.toml'
+```
+
+删除接口没有应用层鉴权，会为所有用户修改全局热榜。若不希望公开用户使用此
+能力，应在网络或反向代理层限制访问。恢复方式见
+[部署运维](./deployment.md#热门搜索屏蔽清单)。
 
 ## `/api/health`
 

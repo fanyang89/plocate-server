@@ -1,6 +1,6 @@
 # Configuration
 
-Source of truth: `src/config.rs:12-132`. Every CLI flag has a matching
+Source of truth: `src/config.rs`. Every CLI flag has a matching
 `PLOCATE_SERVER_*` environment variable (provided by `clap`'s `env` feature).
 Flags win over env; both win over defaults.
 
@@ -61,6 +61,21 @@ configuration might otherwise exclude.
 See [hdd-tuning](./hdd-tuning.md) for the rationale — these knobs exist
 because of the synchronous `stat` fan-out in `state.rs::parse_paths`.
 
+## Trending searches
+
+| Flag | Env | Default | Notes |
+| --- | --- | --- | --- |
+| `--trending-enabled` | `PLOCATE_SERVER_TRENDING_ENABLED` | `true` | Show and record the REST search leaderboard. MCP searches are never counted. |
+| `--trending-window-secs` | `PLOCATE_SERVER_TRENDING_WINDOW_SECS` | `86400` | Rolling count window. Counts reset on restart. |
+| `--trending-bucket-secs` | `PLOCATE_SERVER_TRENDING_BUCKET_SECS` | `3600` | Sliding-window bucket size. |
+| `--trending-min-query-len` | `PLOCATE_SERVER_TRENDING_MIN_QUERY_LEN` | `2` | Minimum normalized query length in characters. |
+| `--trending-top-n` | `PLOCATE_SERVER_TRENDING_TOP_N` | `20` | Default leaderboard size, clamped to 1..=100. |
+| `--trending-blocklist-path` | `PLOCATE_SERVER_TRENDING_BLOCKLIST_PATH` | next to `files.db` | Sorted JSON array of normalized queries permanently excluded from trending. |
+
+The packaged service resolves the blocklist to
+`/var/lib/plocate-server/trending-blocklist.json`. A malformed blocklist stops
+startup instead of silently exposing blocked queries.
+
 ## UI / instance
 
 | Flag | Env | Default | Notes |
@@ -81,7 +96,7 @@ box. See [deployment → path prefix](./deployment.md#mount-under-a-path-prefix)
 
 The env file shipped inside the RPM/pacman package
 (`packaging/etc/plocate-server.env`) contains only the commonly-tuned subset:
-`BASE_PATH`, `BIND`, `DB_PATH`, vendored binary paths, `MAX_RESULTS`,
+`BASE_PATH`, `BIND`, `DB_PATH`, `TRENDING_BLOCKLIST_PATH`, vendored binary paths, `MAX_RESULTS`,
 `MAX_CONCURRENT_SEARCHES`, `SEARCH_TIMEOUT_SECS`, `UPDATEDB_TIMEOUT_SECS`,
 and a commented `RUST_LOG`. It intentionally omits the HDD knobs and the UI
 optional flags — set those via the systemd unit override or a drop-in env

@@ -109,10 +109,11 @@ All flags have matching `PLOCATE_SERVER_*` env vars. Most-used:
 | `--db-path` | `PLOCATE_SERVER_DB_PATH` | `$XDG_DATA_HOME/plocate-server/files.db` |
 | `--max-results` | `PLOCATE_SERVER_MAX_RESULTS` | `100` |
 | `--max-concurrent-searches` | `PLOCATE_SERVER_MAX_CONCURRENT_SEARCHES` | `8` |
+| `--trending-blocklist-path` | `PLOCATE_SERVER_TRENDING_BLOCKLIST_PATH` | next to `files.db` |
 | `--public-base-url` | `PLOCATE_SERVER_PUBLIC_BASE_URL` | *(unset)* |
 | `--file-server-url` | `PLOCATE_SERVER_FILE_SERVER_URL` | *(unset)* |
 
-Full table (17 flags) → [configuration](./docs/en/configuration.md).
+Full table → [configuration](./docs/en/configuration.md).
 
 ## Development
 

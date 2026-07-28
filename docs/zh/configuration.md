@@ -1,6 +1,6 @@
 # 配置参考
 
-事实来源：`src/config.rs:12-132`。每个 CLI flag 都有对应的 `PLOCATE_SERVER_*`
+事实来源：`src/config.rs`。每个 CLI flag 都有对应的 `PLOCATE_SERVER_*`
 环境变量（由 `clap` 的 `env` 特性提供）。优先级：flag > 环境变量 > 默认值。
 
 ## 必填项
@@ -57,6 +57,21 @@
 详见 [HDD 调优](./hdd-tuning.md) —— 这些旋钮的存在正是由于
 `state.rs::parse_paths` 中的同步 `stat` 扇出。
 
+## 热门搜索
+
+| Flag | 环境变量 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `--trending-enabled` | `PLOCATE_SERVER_TRENDING_ENABLED` | `true` | 展示并记录 REST 搜索热榜；MCP 搜索始终不计数。 |
+| `--trending-window-secs` | `PLOCATE_SERVER_TRENDING_WINDOW_SECS` | `86400` | 滚动计数窗口；重启后计数清零。 |
+| `--trending-bucket-secs` | `PLOCATE_SERVER_TRENDING_BUCKET_SECS` | `3600` | 滑动窗口的桶大小。 |
+| `--trending-min-query-len` | `PLOCATE_SERVER_TRENDING_MIN_QUERY_LEN` | `2` | 归一化查询的最小字符数。 |
+| `--trending-top-n` | `PLOCATE_SERVER_TRENDING_TOP_N` | `20` | 默认榜单长度，限制在 1..=100。 |
+| `--trending-blocklist-path` | `PLOCATE_SERVER_TRENDING_BLOCKLIST_PATH` | 与 `files.db` 同目录 | 永久排除关键词的排序 JSON 数组。 |
+
+软件包服务将屏蔽文件解析为
+`/var/lib/plocate-server/trending-blocklist.json`。文件损坏时服务会停止启动，
+而不是静默暴露已屏蔽的关键词。
+
 ## UI / 实例
 
 | Flag | 环境变量 | 默认值 | 说明 |
@@ -77,7 +92,7 @@
 
 RPM/pacman 包内附带的环境文件
 （`packaging/etc/plocate-server.env`）只包含常用调优子集：`BASE_PATH`、
-`BIND`、`DB_PATH`、内置二进制路径、`MAX_RESULTS`、
+`BIND`、`DB_PATH`、`TRENDING_BLOCKLIST_PATH`、内置二进制路径、`MAX_RESULTS`、
 `MAX_CONCURRENT_SEARCHES`、`SEARCH_TIMEOUT_SECS`、`UPDATEDB_TIMEOUT_SECS`，
 以及注释掉的 `RUST_LOG`。它刻意省略了 HDD 调优旋钮和 UI 可选 flag ——
 请通过 systemd unit override 或 env drop-in 文件设置它们。

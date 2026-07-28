@@ -15,6 +15,8 @@ All routes are JSON, mounted under `/api` by default (or `/{prefix}/api` when
 | GET | `/api/base-path` | lifecycle | Currently indexed root |
 | GET | `/api/file-server` | lifecycle | External file-server base URL (if configured) |
 | GET | `/api/feedback` | lifecycle | Contact email (if configured) |
+| GET | `/api/trending` | lifecycle | REST search leaderboard for the rolling window |
+| DELETE | `/api/trending` | lifecycle | Permanently block a query from the leaderboard |
 
 Plus the auto-generated surfaces:
 
@@ -75,6 +77,27 @@ where plain substring search returns nothing.
 ```bash
 curl 'http://127.0.0.1:8787/api/fuzzy?q=zookeeper%20rpm%20oe1'
 ```
+
+## `/api/trending`
+
+`GET /api/trending` returns `{ window_secs, items: [{ query, count }] }`, sorted
+by descending count. Only successful REST searches are counted; MCP searches
+never enter the leaderboard.
+
+`DELETE /api/trending?q=<query>` removes the query from every active count
+bucket and atomically adds its normalized form to the on-disk blocklist. Later
+searches still run normally but cannot make that query trend again. The call is
+idempotent and returns `204`.
+
+```bash
+curl http://127.0.0.1:8787/api/trending | jq
+curl -X DELETE 'http://127.0.0.1:8787/api/trending?q=cargo.toml'
+```
+
+The delete endpoint has no application-level authentication and changes the
+global leaderboard for every user. Restrict access at the network or reverse
+proxy layer when public users should not have this capability. See
+[deployment](./deployment.md#trending-query-blocklist) for recovery.
 
 ## `/api/health`
 
