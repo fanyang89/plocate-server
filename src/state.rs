@@ -69,6 +69,12 @@ pub struct AppState {
     pub trending: Option<Arc<TrendingTracker>>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SearchOrigin {
+    Rest,
+    Mcp,
+}
+
 /// Parsed `--public-base-url` value.
 ///
 /// `prefix` is the path component normalized to "/" + segments with no
@@ -231,6 +237,7 @@ impl AppState {
         offset: usize,
         case_insensitive: bool,
         basename_only: bool,
+        origin: SearchOrigin,
     ) -> Result<SearchResponse> {
         let started = Instant::now();
         if !self.db_exists() {
@@ -264,7 +271,9 @@ impl AppState {
         let total_returned = items.len();
         let truncated = (total_returned == cap && cap > 0) || stat_truncated;
         let paged: Vec<FileItemDto> = items.into_iter().skip(offset).take(limit).collect();
-        if let Some(t) = &self.trending {
+        if origin == SearchOrigin::Rest
+            && let Some(t) = &self.trending
+        {
             t.record(query);
         }
         Ok(SearchResponse {
@@ -290,6 +299,7 @@ impl AppState {
         limit: usize,
         offset: usize,
         case_insensitive: bool,
+        origin: SearchOrigin,
     ) -> Result<SearchResponse> {
         let started = Instant::now();
         if !self.db_exists() {
@@ -326,7 +336,9 @@ impl AppState {
         let ranked = crate::rank::rerank(query, case_insensitive, items);
         let total_matched = ranked.len();
         let paged: Vec<FileItemDto> = ranked.into_iter().skip(offset).take(limit).collect();
-        if let Some(t) = &self.trending {
+        if origin == SearchOrigin::Rest
+            && let Some(t) = &self.trending
+        {
             t.record(query);
         }
         Ok(SearchResponse {

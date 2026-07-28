@@ -15,7 +15,7 @@ use serde::Deserialize;
 
 use crate::dto::SearchResponse;
 use crate::limits::{validate_offset, validate_query};
-use crate::state::AppState;
+use crate::state::{AppState, SearchOrigin};
 
 pub struct PlocateMcpHandler {
     state: AppState,
@@ -107,7 +107,14 @@ impl PlocateMcpHandler {
         );
         match self
             .state
-            .search(&p.query, limit, offset, p.case_insensitive, basename_only)
+            .search(
+                &p.query,
+                limit,
+                offset,
+                p.case_insensitive,
+                basename_only,
+                SearchOrigin::Mcp,
+            )
             .await
         {
             Ok(resp) => Ok(CallToolResult::success(vec![Content::text(format_search(
@@ -139,7 +146,14 @@ impl PlocateMcpHandler {
             .clamp(1, self.state.max_results.max(1));
         match self
             .state
-            .search(&p.pattern, limit, offset, p.case_insensitive, false)
+            .search(
+                &p.pattern,
+                limit,
+                offset,
+                p.case_insensitive,
+                false,
+                SearchOrigin::Mcp,
+            )
             .await
         {
             Ok(resp) => Ok(CallToolResult::success(vec![Content::text(format_search(
@@ -171,7 +185,13 @@ impl PlocateMcpHandler {
             .clamp(1, self.state.max_results.max(1));
         match self
             .state
-            .search_fuzzy(&p.query, limit, offset, p.case_insensitive)
+            .search_fuzzy(
+                &p.query,
+                limit,
+                offset,
+                p.case_insensitive,
+                SearchOrigin::Mcp,
+            )
             .await
         {
             Ok(resp) => Ok(CallToolResult::success(vec![Content::text(format_search(

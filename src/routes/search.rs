@@ -6,7 +6,7 @@ use utoipa::IntoParams;
 use crate::dto::SearchResponse;
 use crate::error::Result;
 use crate::limits::{validate_offset, validate_query};
-use crate::state::AppState;
+use crate::state::{AppState, SearchOrigin};
 
 #[derive(Debug, Deserialize, IntoParams)]
 pub struct SearchParams {
@@ -51,7 +51,14 @@ pub async fn search(
         Some("basename") | Some("b") | Some("name")
     );
     let resp = state
-        .search(&params.q, limit, offset, case_insensitive, basename_only)
+        .search(
+            &params.q,
+            limit,
+            offset,
+            case_insensitive,
+            basename_only,
+            SearchOrigin::Rest,
+        )
         .await?;
     Ok(Json(resp))
 }
@@ -90,7 +97,14 @@ pub async fn glob(
     let offset = validate_offset(params.offset)?;
     let case_insensitive = params.case.unwrap_or(true);
     let resp = state
-        .search(&params.pattern, limit, offset, case_insensitive, false)
+        .search(
+            &params.pattern,
+            limit,
+            offset,
+            case_insensitive,
+            false,
+            SearchOrigin::Rest,
+        )
         .await?;
     Ok(Json(resp))
 }
@@ -131,7 +145,13 @@ pub async fn fuzzy(
     let offset = validate_offset(params.offset)?;
     let case_insensitive = params.case.unwrap_or(true);
     let resp = state
-        .search_fuzzy(&params.q, limit, offset, case_insensitive)
+        .search_fuzzy(
+            &params.q,
+            limit,
+            offset,
+            case_insensitive,
+            SearchOrigin::Rest,
+        )
         .await?;
     Ok(Json(resp))
 }
