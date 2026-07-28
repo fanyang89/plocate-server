@@ -15,6 +15,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { useTrending } from "@/hooks/use-trending"
+import { trendingKeywords } from "@/lib/trending"
 
 type TrendingProps = {
   onPick: (query: string) => void
@@ -31,6 +32,7 @@ export function Trending({ onPick }: TrendingProps) {
     resetBlockError,
   } = useTrending()
   const [candidate, setCandidate] = useState<string | null>(null)
+  const candidateKeywords = candidate ? trendingKeywords(candidate) : []
 
   const openConfirmation = (query: string) => {
     resetBlockError()
@@ -113,10 +115,21 @@ export function Trending({ onPick }: TrendingProps) {
         >
           <DialogHeader>
             <DialogTitle>{t("trending.confirmTitle")}</DialogTitle>
-            <DialogDescription className="break-words">
-              {t("trending.confirmDescription", { query: candidate })}
-            </DialogDescription>
+            <DialogDescription>{t("trending.confirmDescription")}</DialogDescription>
           </DialogHeader>
+          <div
+            className="flex flex-wrap gap-1.5"
+            aria-label={t("trending.keywords")}
+          >
+            {candidateKeywords.map((keyword) => (
+              <code
+                key={keyword}
+                className="rounded-md bg-muted px-2 py-1 font-mono text-xs text-foreground"
+              >
+                {keyword}
+              </code>
+            ))}
+          </div>
           {blockError && (
             <p className="text-xs text-destructive" role="alert">
               {t("trending.blockFailed")}

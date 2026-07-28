@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { deleteTrending, fetchTrending, type TrendingItem } from "@/api"
+import { matchesTrendingRule, trendingKeywords } from "@/lib/trending"
 
 type TrendingData = {
   items: TrendingItem[]
@@ -24,7 +25,7 @@ export function useTrending(): TrendingState {
   })
   const fetchAbortRef = useRef<AbortController | null>(null)
   const blockAbortRef = useRef<AbortController | null>(null)
-  const hiddenQueriesRef = useRef(new Set<string>())
+  const blockedRulesRef = useRef(new Set<string>())
 
   useEffect(() => {
     let cancelled = false
@@ -36,10 +37,14 @@ export function useTrending(): TrendingState {
       try {
         const data = await fetchTrending(ctrl.signal)
         if (!cancelled) {
+          const blockedRules = Array.from(blockedRulesRef.current)
           setState((current) => ({
             ...current,
             items: data.items.filter(
-              (item) => !hiddenQueriesRef.current.has(item.query),
+              (item) =>
+                !blockedRules.some((rule) =>
+                  matchesTrendingRule(item.query, rule),
+                ),
             ),
             loading: false,
           }))
@@ -73,10 +78,13 @@ export function useTrending(): TrendingState {
     }))
     try {
       await deleteTrending(query, ctrl.signal)
-      hiddenQueriesRef.current.add(query)
+      const rule = trendingKeywords(query).join(" ")
+      blockedRulesRef.current.add(rule)
       setState((current) => ({
         ...current,
-        items: current.items.filter((item) => item.query !== query),
+        items: current.items.filter(
+          (item) => !matchesTrendingRule(item.query, rule),
+        ),
         blockingQuery: null,
       }))
       return true
