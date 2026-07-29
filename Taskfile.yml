@@ -3,11 +3,16 @@ version: "3"
 vars:
   TARGET: x86_64-unknown-linux-musl
   BIN: target/{{.TARGET}}/release/plocate-server
-  # Single source of truth for the package version is Cargo.toml; nfpm.yaml
-  # has no good way to read it directly, so we extract it here and pass
-  # --version on the CLI to override the hardcoded fallback in the yaml.
+  # Tagged builds use the release tag so package metadata always matches the
+  # GitHub release. Untagged development builds fall back to Cargo.toml.
   VERSION:
-    sh: grep -m1 '^version' Cargo.toml | sed 's/.*"\(.*\)".*/\1/'
+    sh: |
+      tag=$(git describe --tags --exact-match --match 'v[0-9]*' HEAD 2>/dev/null || true)
+      if [ -n "$tag" ]; then
+        printf '%s\n' "${tag#v}"
+      else
+        grep -m1 '^version' Cargo.toml | sed 's/.*"\(.*\)".*/\1/'
+      fi
 
 tasks:
   default:
@@ -114,8 +119,7 @@ tasks:
         msg: "nfpm not installed (go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest)"
     deps: [build, plocate]
     env:
-      # nfpm expands ${VERSION} in packaging/nfpm.yaml; sourced from
-      # Cargo.toml so the package tracks the binary version automatically.
+      # nfpm expands ${VERSION} in packaging/nfpm.yaml.
       VERSION: "{{.VERSION}}"
     sources:
       - packaging/**/*
