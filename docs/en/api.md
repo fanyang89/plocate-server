@@ -16,6 +16,7 @@ All routes are JSON, mounted under `/api` by default (or `/{prefix}/api` when
 | GET | `/api/file-server` | lifecycle | External file-server base URL (if configured) |
 | GET | `/api/feedback` | lifecycle | Contact email (if configured) |
 | GET | `/api/trending` | lifecycle | REST search leaderboard for the rolling window |
+| POST | `/api/trending` | lifecycle | Record a completed search query |
 | DELETE | `/api/trending` | lifecycle | Permanently block a query from the leaderboard |
 
 Plus the auto-generated surfaces:
@@ -40,6 +41,7 @@ Plus the auto-generated surfaces:
 | `offset` | no | `0` | Pagination (0-based, max 10000). |
 | `case` | no | `true` | Case-insensitive when `true`. |
 | `scope` | no | `path` | `path` (full path) or `basename` / `b` / `name`. |
+| `track` | no | `true` | Whether a successful request contributes to trending. |
 
 ```bash
 curl 'http://127.0.0.1:8787/api/search?q=invoice&limit=20'
@@ -55,6 +57,7 @@ curl 'http://127.0.0.1:8787/api/search?q=README&case=false'
 | `limit` | no | `max_results` | |
 | `offset` | no | `0` | |
 | `case` | no | `true` | |
+| `track` | no | `true` | Whether a successful request contributes to trending. |
 
 ```bash
 curl 'http://127.0.0.1:8787/api/glob?pattern=*2024*.log'
@@ -73,6 +76,7 @@ where plain substring search returns nothing.
 | `limit` | no | `max_results` | |
 | `offset` | no | `0` | |
 | `case` | no | `true` | |
+| `track` | no | `true` | Whether a successful request contributes to trending. |
 
 ```bash
 curl 'http://127.0.0.1:8787/api/fuzzy?q=zookeeper%20rpm%20oe1'
@@ -81,8 +85,12 @@ curl 'http://127.0.0.1:8787/api/fuzzy?q=zookeeper%20rpm%20oe1'
 ## `/api/trending`
 
 `GET /api/trending` returns `{ window_secs, items: [{ query, count }] }`, sorted
-by descending count. Only successful REST searches are counted; MCP searches
-never enter the leaderboard.
+by descending count. Successful REST searches are counted by default; requests
+with `track=false` and MCP searches are not. The Web UI uses `track=false` for
+live results, then calls `POST /api/trending?q=<query>` after the input has been
+stable for two seconds and its search succeeds. This prevents intermediate
+prefixes from entering the leaderboard. POST returns `204`; it is a no-op when
+trending is disabled.
 
 `DELETE /api/trending?q=<keywords>` splits `q` on whitespace and creates a
 case-insensitive substring AND rule. Every trending query containing all
@@ -93,6 +101,7 @@ also matches `iso release x86` and `pre-release linux.iso`, but not
 
 ```bash
 curl http://127.0.0.1:8787/api/trending | jq
+curl -X POST 'http://127.0.0.1:8787/api/trending?q=release%20iso'
 curl -X DELETE 'http://127.0.0.1:8787/api/trending?q=release%20iso'
 ```
 

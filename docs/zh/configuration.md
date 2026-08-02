@@ -61,7 +61,7 @@
 
 | Flag | 环境变量 | 默认值 | 说明 |
 | --- | --- | --- | --- |
-| `--trending-enabled` | `PLOCATE_SERVER_TRENDING_ENABLED` | `true` | 展示并记录 REST 搜索热榜；MCP 搜索始终不计数。 |
+| `--trending-enabled` | `PLOCATE_SERVER_TRENDING_ENABLED` | `true` | 展示并记录 REST 搜索热榜；Web 等待输入稳定 2 秒，MCP 搜索始终不计数。 |
 | `--trending-window-secs` | `PLOCATE_SERVER_TRENDING_WINDOW_SECS` | `86400` | 滚动计数窗口；重启后计数清零。 |
 | `--trending-bucket-secs` | `PLOCATE_SERVER_TRENDING_BUCKET_SECS` | `3600` | 滑动窗口的桶大小。 |
 | `--trending-min-query-len` | `PLOCATE_SERVER_TRENDING_MIN_QUERY_LEN` | `2` | 归一化查询的最小字符数。 |

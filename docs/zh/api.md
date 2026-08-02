@@ -15,6 +15,7 @@
 | GET | `/api/file-server` | lifecycle | 外部文件服务基址（如已配置） |
 | GET | `/api/feedback` | lifecycle | 联系邮箱（如已配置） |
 | GET | `/api/trending` | lifecycle | 滚动窗口内的 REST 搜索热榜 |
+| POST | `/api/trending` | lifecycle | 记录一条已完成的搜索查询 |
 | DELETE | `/api/trending` | lifecycle | 从热榜永久屏蔽关键词 |
 
 另有自动生成的接口：
@@ -39,6 +40,7 @@
 | `offset` | 否 | `0` | 分页偏移（0 起，最大 10000）。 |
 | `case` | 否 | `true` | `true` 时大小写不敏感。 |
 | `scope` | 否 | `path` | `path`（全路径）或 `basename` / `b` / `name`。 |
+| `track` | 否 | `true` | 是否将成功请求计入热榜。 |
 
 ```bash
 curl 'http://127.0.0.1:8787/api/search?q=invoice&limit=20'
@@ -54,6 +56,7 @@ curl 'http://127.0.0.1:8787/api/search?q=README&case=false'
 | `limit` | 否 | `max_results` | |
 | `offset` | 否 | `0` | |
 | `case` | 否 | `true` | |
+| `track` | 否 | `true` | 是否将成功请求计入热榜。 |
 
 ```bash
 curl 'http://127.0.0.1:8787/api/glob?pattern=*2024*.log'
@@ -71,6 +74,7 @@ fzf 风格的模糊相关度排序。适合子串搜索返回空的多关键词�
 | `limit` | 否 | `max_results` | |
 | `offset` | 否 | `0` | |
 | `case` | 否 | `true` | |
+| `track` | 否 | `true` | 是否将成功请求计入热榜。 |
 
 ```bash
 curl 'http://127.0.0.1:8787/api/fuzzy?q=zookeeper%20rpm%20oe1'
@@ -79,7 +83,10 @@ curl 'http://127.0.0.1:8787/api/fuzzy?q=zookeeper%20rpm%20oe1'
 ## `/api/trending`
 
 `GET /api/trending` 返回 `{ window_secs, items: [{ query, count }] }`，按计数
-降序排列。只有成功的 REST 搜索会被计数；MCP 搜索不会进入热榜。
+降序排列。成功的 REST 搜索默认计数，`track=false` 时不计数；MCP 搜索不会
+进入热榜。Web 即时搜索使用 `track=false`，输入稳定 2 秒且搜索成功后通过
+`POST /api/trending?q=<query>` 记录完整查询，避免输入过程中的前缀进入热榜。
+POST 成功返回 `204`；热榜关闭时为空操作。
 
 `DELETE /api/trending?q=<keywords>` 按空白拆分 `q`，生成大小写不敏感的子串
 AND 规则。包含全部关键词的热榜查询都会从当前计数桶中移除，并禁止后续计数；
@@ -89,6 +96,7 @@ AND 规则。包含全部关键词的热榜查询都会从当前计数桶中移�
 
 ```bash
 curl http://127.0.0.1:8787/api/trending | jq
+curl -X POST 'http://127.0.0.1:8787/api/trending?q=release%20iso'
 curl -X DELETE 'http://127.0.0.1:8787/api/trending?q=release%20iso'
 ```
 

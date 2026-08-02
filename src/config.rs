@@ -117,8 +117,9 @@ pub struct Config {
     pub instance_name: String,
 
     /// Enable the trending-searches leaderboard (`/api/trending` and the
-    /// "hot searches" panel in the UI). Each successful search query bumps a
-    /// rolling-window counter; the top-N most frequent queries are exposed.
+    /// "hot searches" panel in the UI). Successful REST searches bump a
+    /// rolling-window counter by default; callers can defer recording while a
+    /// query is still being composed. The top-N queries are exposed.
     /// Counts are in-memory and reset on restart; blocked queries are persisted
     /// separately via `--trending-blocklist-path`.
     #[arg(long, env = "PLOCATE_SERVER_TRENDING_ENABLED", default_value_t = true)]

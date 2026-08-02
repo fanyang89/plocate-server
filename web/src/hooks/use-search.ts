@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import i18n from "@/i18n"
-import { fetchSearch, type SearchResponse } from "@/api"
+import { fetchSearch, recordTrending, type SearchResponse } from "@/api"
 
 export type SearchStatus =
   | "idle"
@@ -23,7 +23,7 @@ const INITIAL: SearchState = {
   query: "",
 }
 
-export function useSearch(debouncedQuery: string) {
+export function useSearch(debouncedQuery: string, stableQuery: string) {
   const [state, setState] = useState<SearchState>(INITIAL)
   const [nonce, setNonce] = useState(0)
   const abortRef = useRef<AbortController | null>(null)
@@ -50,7 +50,7 @@ export function useSearch(debouncedQuery: string) {
     }))
 
     let cancelled = false
-    fetchSearch(q, ctrl.signal)
+    fetchSearch(q, ctrl.signal, false)
       .then((data) => {
         if (cancelled) return
         setState({
@@ -78,6 +78,19 @@ export function useSearch(debouncedQuery: string) {
       ctrl.abort()
     }
   }, [debouncedQuery, nonce])
+
+  useEffect(() => {
+    const q = stableQuery.trim()
+    const searchCompleted = state.status === "success" || state.status === "empty"
+    if (!q || !searchCompleted || state.query !== q) return
+
+    const ctrl = new AbortController()
+    recordTrending(q, ctrl.signal).catch((e: unknown) => {
+      if ((e as Error).name === "AbortError") return
+      // Silent: trending is non-essential and must not affect search results.
+    })
+    return () => ctrl.abort()
+  }, [stableQuery, state.query, state.status])
 
   return { state, refetch }
 }
