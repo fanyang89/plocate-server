@@ -54,6 +54,37 @@ pub struct DeleteTrendingParams {
     pub q: String,
 }
 
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct RecordTrendingParams {
+    /// A completed search query to add to the trending leaderboard.
+    pub q: String,
+}
+
+/// Record a completed search without running it again.
+#[utoipa::path(
+    post,
+    path = "/api/trending",
+    tag = "lifecycle",
+    params(RecordTrendingParams),
+    responses(
+        (status = 204, description = "Completed query recorded"),
+        (status = 400, description = "Bad request", body = serde_json::Value),
+    )
+)]
+pub async fn record_trending(
+    State(state): State<AppState>,
+    Query(params): Query<RecordTrendingParams>,
+) -> Result<StatusCode> {
+    validate_query(&params.q)?;
+    if params.q.trim().is_empty() {
+        return Err(AppError::BadRequest("query must not be empty".to_string()));
+    }
+    if let Some(tracker) = state.trending {
+        tracker.record(&params.q);
+    }
+    Ok(StatusCode::NO_CONTENT)
+}
+
 /// Permanently exclude queries matching a case-insensitive keyword AND rule.
 #[utoipa::path(
     delete,

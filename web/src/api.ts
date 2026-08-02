@@ -80,11 +80,13 @@ export class SearchError extends Error {
 export async function fetchSearch(
   q: string,
   signal: AbortSignal,
+  track = true,
 ): Promise<SearchResponse> {
   const params = new URLSearchParams({
     q,
     limit: "100",
     case: "true",
+    track: String(track),
   })
 
   let res: Response
@@ -182,6 +184,22 @@ export async function fetchTrending(
   })
   if (!res.ok) throw new Error(`trending failed (${res.status})`)
   return (await res.json()) as TrendingResponse
+}
+
+export async function recordTrending(
+  query: string,
+  signal: AbortSignal,
+): Promise<void> {
+  const params = new URLSearchParams({ q: query })
+  const res = await fetch(
+    `${withPrefix("/api/trending")}?${params.toString()}`,
+    {
+      method: "POST",
+      signal,
+      headers: { accept: "application/json" },
+    },
+  )
+  if (!res.ok) throw new Error(`record trending failed (${res.status})`)
 }
 
 export async function deleteTrending(

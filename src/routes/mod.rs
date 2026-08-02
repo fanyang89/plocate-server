@@ -65,7 +65,9 @@ pub fn router(state: AppState) -> Router {
         .route("/api/feedback", get(health::feedback))
         .route(
             "/api/trending",
-            get(trending::trending).delete(trending::delete_trending),
+            get(trending::trending)
+                .post(trending::record_trending)
+                .delete(trending::delete_trending),
         )
         .merge(
             SwaggerUi::new("/swagger-ui")
@@ -163,6 +165,7 @@ mod tests {
         let json: Value = serde_json::from_slice(body).unwrap();
         let version = json.get("openapi").and_then(Value::as_str).unwrap();
         assert!(version.starts_with("3."));
+        assert!(json.pointer("/paths/~1api~1trending/post").is_some());
         assert!(json.pointer("/paths/~1api~1trending/delete").is_some());
     }
 
@@ -185,6 +188,34 @@ mod tests {
         assert_eq!(status, StatusCode::OK);
         let js = String::from_utf8(body).unwrap();
         assert!(js.contains("/search/openapi.json"));
+    }
+
+    #[tokio::test]
+    async fn post_trending_records_completed_query() {
+        let blocklist_path = std::env::temp_dir().join(format!(
+            "plocate-server-routes-record-blocklist-{}.json",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&blocklist_path);
+        let mut config = test_config(None);
+        config.trending_enabled = true;
+        config.trending_blocklist_path = Some(blocklist_path);
+        let state = AppState::new(&config).unwrap();
+        let tracker = state.trending.clone().unwrap();
+
+        let response = router(state)
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/trending?q=Cargo.toml")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::NO_CONTENT);
+        assert_eq!(tracker.top_k(10), vec![("cargo.toml".to_string(), 1)]);
     }
 
     #[tokio::test]

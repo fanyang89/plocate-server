@@ -6,7 +6,7 @@ use utoipa::IntoParams;
 use crate::dto::SearchResponse;
 use crate::error::Result;
 use crate::limits::{validate_offset, validate_query};
-use crate::state::{AppState, SearchOrigin};
+use crate::state::AppState;
 
 #[derive(Debug, Deserialize, IntoParams)]
 pub struct SearchParams {
@@ -24,6 +24,9 @@ pub struct SearchParams {
     /// `path` (default, match against full path) or `basename`.
     #[param(default = "path")]
     pub scope: Option<String>,
+    /// Whether this request contributes to the trending leaderboard.
+    #[param(default = true)]
+    pub track: Option<bool>,
 }
 
 /// Filename / path search via the plocate trigram index.
@@ -57,7 +60,7 @@ pub async fn search(
             offset,
             case_insensitive,
             basename_only,
-            SearchOrigin::Rest,
+            params.track.unwrap_or(true),
         )
         .await?;
     Ok(Json(resp))
@@ -74,6 +77,9 @@ pub struct GlobParams {
     /// Case-insensitive match (default true).
     #[param(default = true)]
     pub case: Option<bool>,
+    /// Whether this request contributes to the trending leaderboard.
+    #[param(default = true)]
+    pub track: Option<bool>,
 }
 
 /// Glob search. Identical to `/api/search` but explicit about glob intent.
@@ -103,7 +109,7 @@ pub async fn glob(
             offset,
             case_insensitive,
             false,
-            SearchOrigin::Rest,
+            params.track.unwrap_or(true),
         )
         .await?;
     Ok(Json(resp))
@@ -122,6 +128,9 @@ pub struct FuzzyParams {
     /// Case-insensitive match (default true).
     #[param(default = true)]
     pub case: Option<bool>,
+    /// Whether this request contributes to the trending leaderboard.
+    #[param(default = true)]
+    pub track: Option<bool>,
 }
 
 /// Fuzzy multi-keyword search with relevance ranking.
@@ -150,7 +159,7 @@ pub async fn fuzzy(
             limit,
             offset,
             case_insensitive,
-            SearchOrigin::Rest,
+            params.track.unwrap_or(true),
         )
         .await?;
     Ok(Json(resp))

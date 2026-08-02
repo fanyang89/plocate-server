@@ -20,6 +20,7 @@ use utoipa::openapi::Server;
         crate::routes::stats::stats,
         crate::routes::reindex::reindex,
         crate::routes::trending::trending,
+        crate::routes::trending::record_trending,
         crate::routes::trending::delete_trending,
     ),
     components(schemas(

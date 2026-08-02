@@ -46,7 +46,8 @@ export default function App() {
   const [query, setQuery] = useState("")
 
   const debounced = useDebounce(query, 300)
-  const { state, refetch } = useSearch(debounced)
+  const stableQuery = useDebounce(query, 2_000)
+  const { state, refetch } = useSearch(debounced, stableQuery)
   const health = useHealth()
   const fileServer = useFileServer()
 

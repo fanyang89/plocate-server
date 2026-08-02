@@ -65,7 +65,7 @@ because of the synchronous `stat` fan-out in `state.rs::parse_paths`.
 
 | Flag | Env | Default | Notes |
 | --- | --- | --- | --- |
-| `--trending-enabled` | `PLOCATE_SERVER_TRENDING_ENABLED` | `true` | Show and record the REST search leaderboard. MCP searches are never counted. |
+| `--trending-enabled` | `PLOCATE_SERVER_TRENDING_ENABLED` | `true` | Show and record the REST search leaderboard. The Web UI waits for two seconds of stable input; MCP searches are never counted. |
 | `--trending-window-secs` | `PLOCATE_SERVER_TRENDING_WINDOW_SECS` | `86400` | Rolling count window. Counts reset on restart. |
 | `--trending-bucket-secs` | `PLOCATE_SERVER_TRENDING_BUCKET_SECS` | `3600` | Sliding-window bucket size. |
 | `--trending-min-query-len` | `PLOCATE_SERVER_TRENDING_MIN_QUERY_LEN` | `2` | Minimum normalized query length in characters. |
