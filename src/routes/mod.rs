@@ -48,11 +48,9 @@ pub fn router(state: AppState) -> Router {
         format!("{prefix}/openapi.json")
     };
 
-    // Inner router carries every API/Swagger/MCP route but NO fallback. In
-    // axum 0.7 a nested router's fallback does not fire for unmatched nested
-    // paths (the outer router's fallback does), so we install the SPA
-    // fallback on the outer router regardless of mount mode and let it strip
-    // the prefix itself.
+    // Inner router carries every API/Swagger/MCP route but NO fallback. Keep
+    // the SPA fallback on the outer router so it receives the full path and
+    // can strip the configured prefix itself.
     let inner = Router::new()
         .route("/api/search", get(search::search))
         .route("/api/glob", get(search::glob))
@@ -188,6 +186,104 @@ mod tests {
         assert_eq!(status, StatusCode::OK);
         let js = String::from_utf8(body).unwrap();
         assert!(js.contains("/search/openapi.json"));
+    }
+
+    #[tokio::test]
+    async fn swagger_ui_serves_embedded_assets_at_root_and_prefix() {
+        for prefix in ["", "/search"] {
+            let base_url = (!prefix.is_empty()).then_some(prefix);
+            for (asset, expected) in [
+                ("", "swagger-ui-bundle.js"),
+                ("swagger-ui-bundle.js", "SwaggerUIBundle"),
+                ("swagger-ui.css", ".swagger-ui"),
+            ] {
+                let path = format!("{prefix}/swagger-ui/{asset}");
+                let (status, body) = get(&path, base_url).await;
+                assert_eq!(status, StatusCode::OK, "{path}");
+                assert!(
+                    String::from_utf8(body).unwrap().contains(expected),
+                    "{path}"
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn canonical_base_url_is_preserved_in_openapi() {
+        let (status, body) = get("/search/openapi.json", Some("https://example.test/search")).await;
+        assert_openapi_json(status, &body);
+        let json: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["servers"][0]["url"], "https://example.test/search");
+    }
+
+    #[tokio::test]
+    async fn bare_prefix_redirects_to_spa_root() {
+        let state = AppState::new(&test_config(Some("/search"))).unwrap();
+        let response = router(state)
+            .oneshot(
+                Request::builder()
+                    .uri("/search")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::PERMANENT_REDIRECT);
+        assert_eq!(response.headers()["location"], "/search/");
+    }
+
+    #[tokio::test]
+    async fn mcp_transport_works_at_root_and_prefix() {
+        for prefix in ["", "/search"] {
+            let config = test_config((!prefix.is_empty()).then_some(prefix));
+            let app = router(AppState::new(&config).unwrap());
+            for (method, params) in [
+                (
+                    "initialize",
+                    serde_json::json!({
+                        "protocolVersion": "2025-03-26",
+                        "capabilities": {},
+                        "clientInfo": { "name": "router-test", "version": "1.0" },
+                    }),
+                ),
+                ("tools/list", serde_json::json!({})),
+            ] {
+                let request = Request::builder()
+                    .method("POST")
+                    .uri(format!("{prefix}/mcp"))
+                    .header("host", "localhost")
+                    .header("content-type", "application/json")
+                    .header("accept", "application/json, text/event-stream")
+                    .header("mcp-protocol-version", "2025-03-26")
+                    .body(Body::from(
+                        serde_json::json!({
+                            "jsonrpc": "2.0", "id": 1, "method": method, "params": params,
+                        })
+                        .to_string(),
+                    ))
+                    .unwrap();
+                let response = app.clone().oneshot(request).await.unwrap();
+                let status = response.status();
+                let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+                let text = std::str::from_utf8(&body).unwrap();
+                assert_eq!(status, StatusCode::OK, "{prefix} {method}: {text}");
+                let data = text
+                    .lines()
+                    .find_map(|line| line.strip_prefix("data:"))
+                    .unwrap();
+                let json: Value = serde_json::from_str(data).unwrap();
+                assert!(json.get("error").is_none(), "{json}");
+                if method == "initialize" {
+                    assert_eq!(json["result"]["serverInfo"]["name"], "plocate-server");
+                } else {
+                    let tools = json["result"]["tools"].as_array().unwrap();
+                    assert_eq!(tools.len(), 3);
+                    for name in ["search_files", "glob", "fuzzy_search"] {
+                        assert!(tools.iter().any(|tool| tool["name"] == name));
+                    }
+                }
+            }
+        }
     }
 
     #[tokio::test]
