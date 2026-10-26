@@ -8,7 +8,9 @@
 use rmcp::{
     ServerHandler,
     handler::server::wrapper::Parameters,
-    model::{CallToolResult, Content, ErrorData, Implementation, ServerCapabilities, ServerInfo},
+    model::{
+        CallToolResult, ContentBlock, ErrorData, Implementation, ServerCapabilities, ServerInfo,
+    },
     schemars, tool, tool_handler, tool_router,
 };
 use serde::Deserialize;
@@ -117,10 +119,9 @@ impl PlocateMcpHandler {
             )
             .await
         {
-            Ok(resp) => Ok(CallToolResult::success(vec![Content::text(format_search(
-                &resp,
-                self.state.file_server_url.as_deref(),
-            ))])),
+            Ok(resp) => Ok(CallToolResult::success(vec![ContentBlock::text(
+                format_search(&resp, self.state.file_server_url.as_deref()),
+            )])),
             Err(e) => Ok(err_text(&format!("search failed: {e}"))),
         }
     }
@@ -149,10 +150,9 @@ impl PlocateMcpHandler {
             .search(&p.pattern, limit, offset, p.case_insensitive, false, false)
             .await
         {
-            Ok(resp) => Ok(CallToolResult::success(vec![Content::text(format_search(
-                &resp,
-                self.state.file_server_url.as_deref(),
-            ))])),
+            Ok(resp) => Ok(CallToolResult::success(vec![ContentBlock::text(
+                format_search(&resp, self.state.file_server_url.as_deref()),
+            )])),
             Err(e) => Ok(err_text(&format!("glob failed: {e}"))),
         }
     }
@@ -181,10 +181,9 @@ impl PlocateMcpHandler {
             .search_fuzzy(&p.query, limit, offset, p.case_insensitive, false)
             .await
         {
-            Ok(resp) => Ok(CallToolResult::success(vec![Content::text(format_search(
-                &resp,
-                self.state.file_server_url.as_deref(),
-            ))])),
+            Ok(resp) => Ok(CallToolResult::success(vec![ContentBlock::text(
+                format_search(&resp, self.state.file_server_url.as_deref()),
+            )])),
             Err(e) => Ok(err_text(&format!("fuzzy search failed: {e}"))),
         }
     }
@@ -295,7 +294,7 @@ fn percent_encode_segment(input: &str) -> String {
 }
 
 fn err_text(msg: &str) -> CallToolResult {
-    CallToolResult::error(vec![Content::text(msg.to_owned())])
+    CallToolResult::error(vec![ContentBlock::text(msg.to_owned())])
 }
 
 #[cfg(test)]
@@ -320,6 +319,31 @@ mod tests {
             items,
             elapsed_ms: 0.0,
         }
+    }
+
+    #[test]
+    fn success_result_preserves_text_wire_format() {
+        let response = resp(vec![item("file", "src/main.rs")]);
+        let result =
+            CallToolResult::success(vec![ContentBlock::text(format_search(&response, None))]);
+        assert_eq!(
+            serde_json::to_value(result).unwrap(),
+            serde_json::json!({
+                "content": [{"type": "text", "text": "1 match(es)\nsrc/main.rs"}],
+                "isError": false,
+            })
+        );
+    }
+
+    #[test]
+    fn error_result_preserves_text_wire_format() {
+        assert_eq!(
+            serde_json::to_value(err_text("search failed")).unwrap(),
+            serde_json::json!({
+                "content": [{"type": "text", "text": "search failed"}],
+                "isError": true,
+            })
+        );
     }
 
     #[test]
